@@ -1,0 +1,28 @@
+name: Setup backend
+description: Prepare Python backend with uv after repository checkout
+
+inputs:
+  uv-version:
+    description: uv version
+    required: false
+    default: "0.11.28"
+
+runs:
+  using: composite
+  steps:
+    - name: Install uv
+      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+      with:
+        version: ${{ inputs.uv-version }}
+        enable-cache: true
+        cache-dependency-glob: "backend/uv.lock"
+
+    - name: Install Python
+      shell: bash
+      working-directory: backend
+      run: uv python install
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: backend
+      run: uv sync --locked --group dev

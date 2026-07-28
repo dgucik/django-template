@@ -1,0 +1,44 @@
+default_stages: [pre-commit]
+default_language_version:
+  python: python3.13
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-toml
+
+  - repo: local
+    hooks:
+
+
+      - id: ruff-check
+        name: Ruff lint
+        entry: uv --directory backend run ruff check --fix
+        language: system
+        pass_filenames: false
+        files: ^backend/.*\.py$
+      - id: ruff-format
+        name: Ruff format
+        entry: uv --directory backend run ruff format
+        language: system
+        pass_filenames: false
+        files: ^backend/.*\.py$
+      - id: mypy
+        name: mypy
+        entry: uv --directory backend run mypy
+        language: system
+        pass_filenames: false
+        files: ^backend/.*\.py$
+      - id: import-linter
+        name: Import Linter
+        entry: uv --directory backend run lint-imports
+        language: system
+        pass_filenames: false
+        files: ^backend/.*\.py$
