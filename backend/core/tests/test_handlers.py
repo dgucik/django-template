@@ -37,13 +37,11 @@ def test_command_handler_is_always_atomic() -> None:
     databases=["default", "default_readonly"],
     transaction=True,
 )
-def test_command_handler_uses_its_declared_database() -> None:
+def test_command_handler_always_uses_the_default_database() -> None:
     class ExampleCommandHandler(CommandHandler[object]):
-        database_alias = "default_readonly"
-
         def handle(self, command: object) -> None:
-            assert connections[self.database_alias].in_atomic_block
-            assert not connection.in_atomic_block
+            assert connection.in_atomic_block
+            assert not connections["default_readonly"].in_atomic_block
 
     ExampleCommandHandler().handle(object())
 
@@ -72,6 +70,33 @@ def test_query_handler_routes_writes_to_its_read_only_database() -> None:
             )
 
     assert ExampleQueryHandler().handle(object()).database_alias == "default_readonly"
+
+
+@pytest.mark.django_db(databases=["default", "default_readonly"])
+def test_query_handler_cannot_use_an_explicit_writer_queryset() -> None:
+    class ExampleQueryHandler(QueryHandler[object, ExampleViewModel]):
+        def handle(self, query: object) -> ExampleViewModel:
+            return ExampleViewModel(
+                database_alias="default",
+                count=User.objects.using("default").count(),
+            )
+
+    with pytest.raises(RuntimeError, match="cannot use the default database"):
+        ExampleQueryHandler().handle(object())
+
+
+@pytest.mark.django_db(databases=["default", "default_readonly"])
+def test_query_handler_cannot_use_the_writer_connection_directly() -> None:
+    class ExampleQueryHandler(QueryHandler[object, ExampleViewModel]):
+        def handle(self, query: object) -> ExampleViewModel:
+            with connections["default"].cursor() as cursor:
+                cursor.execute("SELECT COUNT(*) FROM users_user")
+                row = cursor.fetchone()
+            assert row is not None
+            return ExampleViewModel(database_alias="default", count=row[0])
+
+    with pytest.raises(RuntimeError, match="cannot use the default database"):
+        ExampleQueryHandler().handle(object())
 
 
 def test_query_handler_does_not_open_its_database_without_an_orm_query(
@@ -212,6 +237,15 @@ class OrderGetHandler(LoggingMixin, QueryHandler[OrderGetQuery, OrderGetViewMode
         ...
 """,
                 "must inherit directly",
+            ),
+            (
+                "handler-without-suffix",
+                """
+class OrderProcessor(QueryHandler[OrderGetQuery, OrderGetViewModel]):
+    def handle(self, query: OrderGetQuery) -> OrderGetViewModel:
+        ...
+""",
+                "must use the Handler suffix",
             ),
             (
                 "invalid-query-result",
@@ -397,22 +431,31 @@ class OrderGetHandler(QueryHandler[OrderGetQuery, OrderGetViewModel]):
                             f"{', '.join(sorted(invalid_names))}"
                         )
 
-            if not node.name.endswith("Handler"):
+            handler_bases: list[tuple[ast.expr, str]] = []
+            for raw_handler_base in node.bases:
+                handler_base = (
+                    raw_handler_base.value
+                    if isinstance(raw_handler_base, ast.Subscript)
+                    else raw_handler_base
+                )
+                handler_base_name = (
+                    handler_base.id
+                    if isinstance(handler_base, ast.Name)
+                    else handler_base.attr
+                    if isinstance(handler_base, ast.Attribute)
+                    else ""
+                )
+                if handler_base_name in {"CommandHandler", "QueryHandler"}:
+                    handler_bases.append((raw_handler_base, handler_base_name))
+
+            if not handler_bases:
                 continue
 
-            raw_base = node.bases[0] if len(node.bases) == 1 else None
-            base = raw_base.value if isinstance(raw_base, ast.Subscript) else raw_base
-            base_name = (
-                base.id
-                if isinstance(base, ast.Name)
-                else base.attr
-                if isinstance(base, ast.Attribute)
-                else ""
-            )
-            if len(node.bases) != 1 or base_name not in {
-                "CommandHandler",
-                "QueryHandler",
-            }:
+            raw_base, base_name = handler_bases[0]
+            if not node.name.endswith("Handler"):
+                violations.append(f"{label}:{node.lineno}: {node.name} must use the Handler suffix")
+
+            if len(node.bases) != 1 or len(handler_bases) != 1:
                 violations.append(
                     f"{label}:{node.lineno}: {node.name} must inherit directly from one handler ABC"
                 )

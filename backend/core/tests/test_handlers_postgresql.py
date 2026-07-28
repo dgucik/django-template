@@ -21,6 +21,11 @@ class PostgreSQLResultViewModel:
     value: str
 
 
+@dataclass(frozen=True, slots=True)
+class PostgreSQLPermissionViewModel:
+    allowed: bool
+
+
 @pytest.mark.django_db(databases=["default", "default_readonly"], transaction=True)
 def test_query_handler_connects_as_the_dedicated_read_only_role() -> None:
     class CurrentUserGetHandler(QueryHandler[object, PostgreSQLResultViewModel]):
@@ -36,6 +41,24 @@ def test_query_handler_connects_as_the_dedicated_read_only_role() -> None:
         CurrentUserGetHandler().handle(object()).value
         == settings.DATABASES["default_readonly"]["USER"]
     )
+
+
+@pytest.mark.django_db(databases=["default", "default_readonly"], transaction=True)
+def test_query_handler_role_cannot_create_temporary_tables() -> None:
+    class TemporaryPermissionGetHandler(
+        QueryHandler[object, PostgreSQLPermissionViewModel],
+    ):
+        def handle(self, query: object) -> PostgreSQLPermissionViewModel:
+            database_alias = router.db_for_read(User)
+            with connections[database_alias].cursor() as cursor:
+                cursor.execute(
+                    "SELECT has_database_privilege(current_user, current_database(), 'TEMPORARY')"
+                )
+                row = cursor.fetchone()
+            assert row is not None
+            return PostgreSQLPermissionViewModel(allowed=row[0])
+
+    assert not TemporaryPermissionGetHandler().handle(object()).allowed
 
 
 @pytest.mark.django_db(databases=["default", "default_readonly"], transaction=True)

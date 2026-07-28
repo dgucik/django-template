@@ -111,14 +111,13 @@ class OrderCreateHandler(CommandHandler[OrderCreateCommand]):
 - Commands contain input data only.
 - Handlers inherit directly from `CommandHandler`, expose only the synchronous
   public method `handle`, and always return `None`.
-- `CommandHandler` wraps the complete use case in `transaction.atomic` on its
-  `database_alias` (`default` unless explicitly overridden).
-- A command writes to one database alias only. Do not attempt distributed
+- `CommandHandler` wraps the complete use case in `transaction.atomic` on
+  `default`.
+- A command writes to the `default` database only. Do not attempt distributed
   transactions; coordinate cross-database work with an outbox or events.
 - Use local models, selectors, services, and factories.
 - Call other modules only through their commands or queries.
-- Schedule irreversible side effects with `transaction.on_commit()` using the
-  command's database alias.
+- Schedule irreversible side effects with `transaction.on_commit()`.
 
 ## Queries
 

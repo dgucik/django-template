@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from contextvars import ContextVar
 from functools import wraps
-from typing import Any, ClassVar
+from typing import Any, ClassVar, NoReturn
 
-from django.db import transaction
+from django.db import connections, transaction
 from django.db.models import Model
 
 _query_database_alias: ContextVar[str | None] = ContextVar(
@@ -21,13 +22,11 @@ class _QueryDatabaseRouter:
 
 
 class CommandHandler[CommandT](ABC):
-    database_alias: ClassVar[str] = "default"
-
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         handle = cls.__dict__.get("handle")
         if handle is not None and not getattr(handle, "__isabstractmethod__", False):
-            atomic_handle = transaction.atomic(using=cls.database_alias)(handle)
+            atomic_handle = transaction.atomic(using="default")(handle)
             type.__setattr__(cls, "handle", atomic_handle)
 
     @abstractmethod
@@ -46,9 +45,19 @@ class QueryHandler[QueryT, ResultT](ABC):
 
         @wraps(handle)
         def read_only_handle(self: Any, query: Any) -> Any:
+            def reject_writer_database(
+                _execute: Callable[..., Any],
+                _sql: str,
+                _params: Any,
+                _many: bool,
+                _context: dict[str, Any],
+            ) -> NoReturn:
+                raise RuntimeError("Query handlers cannot use the default database")
+
             token = _query_database_alias.set(cls.database_alias)
             try:
-                return handle(self, query)
+                with connections["default"].execute_wrapper(reject_writer_database):
+                    return handle(self, query)
             finally:
                 _query_database_alias.reset(token)
 

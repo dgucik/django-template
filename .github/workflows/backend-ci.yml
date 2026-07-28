@@ -166,11 +166,14 @@ jobs:
             --command "CREATE ROLE app_write LOGIN PASSWORD 'app-write-password' CREATEDB"
           psql --host 127.0.0.1 --username postgres --dbname app \
             --command "CREATE DATABASE test_app OWNER app_write"
-          psql --host 127.0.0.1 --username postgres --dbname test_app \
-            --variable readonly_user=app_readonly \
-            --variable readonly_password=app-readonly-password \
-            --variable owner_user=app_write \
-            --file ../scripts/database/postgresql_readonly_role.sql
+          POSTGRES_USER=postgres \
+          POSTGRES_DB=test_app \
+          PGHOST=127.0.0.1 \
+          DJANGO_DB_USER=app_write \
+          DJANGO_DB_PASSWORD=app-write-password \
+          DJANGO_DB_READONLY_USER=app_readonly \
+          DJANGO_DB_READONLY_PASSWORD=app-readonly-password \
+            ../scripts/database/postgresql_init.sh
 
       - name: Pytest
         run: uv run --locked pytest -o addopts= -m "not sqlite" --reuse-db
