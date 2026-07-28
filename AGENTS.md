@@ -234,6 +234,9 @@ Prefer one aggregate per module.
 ## Code quality
 
 - Use Python 3.13, complete type annotations, mypy strict, and Ruff.
+- Write Google-style docstrings for production classes, functions, and methods.
+  Module and package docstrings are optional. Test functions use BDD docstrings
+  containing explicit `Given`, `When`, and `Then` clauses.
 - Write tests as pytest functions and use `pytest-django` for database access.
 - Handler and view-model architecture constraints are enforced by
   `core/tests/test_handlers.py`; database permissions are verified by

@@ -40,11 +40,16 @@ line-length = 100
 extend-exclude = ["migrations"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "DJ", "RUF"]
+select = ["E", "F", "I", "UP", "B", "SIM", "DJ", "RUF", "D"]
+ignore = ["D100", "D104"]
 
 [tool.ruff.lint.per-file-ignores]
 "config/settings/__init__.py" = ["F401"]
 "apps/custom_fields/models.py" = ["DJ001", "RUF012"]
+"**/tests/**" = ["D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.format]
 quote-style = "double"

@@ -6,6 +6,8 @@ from .models import User
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):  # type: ignore[type-arg]
+    """Admin interface for the application user."""
+
     list_display = (
         "username",
         "email",

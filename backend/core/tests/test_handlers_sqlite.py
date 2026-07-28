@@ -20,6 +20,8 @@ class SQLiteResultViewModel:
 def test_query_handler_cannot_write_to_a_read_only_sqlite_connection(
     tmp_path: Path,
 ) -> None:
+    """Given read-only SQLite. When a query attempts a write. Then the database rejects it."""
+
     database_path = tmp_path / "database.sqlite3"
     test_connections = ConnectionHandler(
         {

@@ -22,7 +22,10 @@ class _QueryDatabaseRouter:
 
 
 class CommandHandler[CommandT](ABC):
+    """Execute a command atomically on the writer database."""
+
     def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Wrap each concrete command handler in a database transaction."""
         super().__init_subclass__(**kwargs)
         handle = cls.__dict__.get("handle")
         if handle is not None and not getattr(handle, "__isabstractmethod__", False):
@@ -31,13 +34,17 @@ class CommandHandler[CommandT](ABC):
 
     @abstractmethod
     def handle(self, command: CommandT) -> None:
+        """Execute the command."""
         raise NotImplementedError
 
 
 class QueryHandler[QueryT, ResultT](ABC):
+    """Execute a query through the read-only database connection."""
+
     database_alias: ClassVar[str] = "default_readonly"
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Route each concrete query handler to its read-only connection."""
         super().__init_subclass__(**kwargs)
         handle = cls.__dict__.get("handle")
         if handle is None or getattr(handle, "__isabstractmethod__", False):
@@ -65,4 +72,5 @@ class QueryHandler[QueryT, ResultT](ABC):
 
     @abstractmethod
     def handle(self, query: QueryT) -> ResultT:
+        """Execute the query and return a materialized result."""
         raise NotImplementedError

@@ -28,6 +28,8 @@ class PostgreSQLPermissionViewModel:
 
 @pytest.mark.django_db(databases=["default", "default_readonly"], transaction=True)
 def test_query_handler_connects_as_the_dedicated_read_only_role() -> None:
+    """Given PostgreSQL. When a query connects. Then it uses the dedicated read-only role."""
+
     class CurrentUserGetHandler(QueryHandler[object, PostgreSQLResultViewModel]):
         def handle(self, query: object) -> PostgreSQLResultViewModel:
             database_alias = router.db_for_read(User)
@@ -45,6 +47,8 @@ def test_query_handler_connects_as_the_dedicated_read_only_role() -> None:
 
 @pytest.mark.django_db(databases=["default", "default_readonly"], transaction=True)
 def test_query_handler_role_cannot_create_temporary_tables() -> None:
+    """Given the read-only role. When privileges are checked. Then temporary tables are denied."""
+
     class TemporaryPermissionGetHandler(
         QueryHandler[object, PostgreSQLPermissionViewModel],
     ):
@@ -63,6 +67,8 @@ def test_query_handler_role_cannot_create_temporary_tables() -> None:
 
 @pytest.mark.django_db(databases=["default", "default_readonly"], transaction=True)
 def test_query_handler_cannot_write_through_the_orm() -> None:
+    """Given a query handler. When the ORM attempts a write. Then PostgreSQL rejects it."""
+
     class UserCreateHandler(QueryHandler[object, PostgreSQLResultViewModel]):
         def handle(self, query: object) -> PostgreSQLResultViewModel:
             User.objects.create(username="forbidden-query-write")
@@ -76,6 +82,8 @@ def test_query_handler_cannot_write_through_the_orm() -> None:
 
 @pytest.mark.django_db(databases=["default", "default_readonly"], transaction=True)
 def test_query_handler_allows_a_common_table_expression() -> None:
+    """Given a read-only connection. When a CTE is selected. Then PostgreSQL returns its result."""
+
     class CommonTableExpressionGetHandler(
         QueryHandler[object, PostgreSQLResultViewModel],
     ):
@@ -94,6 +102,8 @@ def test_query_handler_allows_a_common_table_expression() -> None:
 
 @pytest.mark.django_db(databases=["default", "default_readonly"], transaction=True)
 def test_query_handler_cannot_execute_an_ungranted_security_definer_function() -> None:
+    """Given an ungranted function. When a query invokes it. Then PostgreSQL rejects execution."""
+
     with connection.cursor() as cursor:
         cursor.execute(
             """

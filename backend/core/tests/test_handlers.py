@@ -19,6 +19,8 @@ class ExampleViewModel:
 
 @pytest.mark.django_db(transaction=True)
 def test_command_handler_is_always_atomic() -> None:
+    """Given a failing command. When handled. Then its transaction is rolled back."""
+
     class ExampleError(Exception):
         pass
 
@@ -38,6 +40,8 @@ def test_command_handler_is_always_atomic() -> None:
     transaction=True,
 )
 def test_command_handler_always_uses_the_default_database() -> None:
+    """Given a command handler. When handled. Then only the default database is atomic."""
+
     class ExampleCommandHandler(CommandHandler[object]):
         def handle(self, command: object) -> None:
             assert connection.in_atomic_block
@@ -48,6 +52,8 @@ def test_command_handler_always_uses_the_default_database() -> None:
 
 @pytest.mark.django_db(databases=["default", "default_readonly"])
 def test_query_handler_routes_reads_to_its_declared_database() -> None:
+    """Given a query handler. When it reads. Then it uses its declared database."""
+
     class ExampleQueryHandler(QueryHandler[object, ExampleViewModel]):
         def handle(self, query: object) -> ExampleViewModel:
             return ExampleViewModel(
@@ -62,6 +68,8 @@ def test_query_handler_routes_reads_to_its_declared_database() -> None:
 
 
 def test_query_handler_routes_writes_to_its_read_only_database() -> None:
+    """Given a query handler. When ORM selects a writer. Then it receives the read-only alias."""
+
     class ExampleQueryHandler(QueryHandler[object, ExampleViewModel]):
         def handle(self, query: object) -> ExampleViewModel:
             return ExampleViewModel(
@@ -74,6 +82,8 @@ def test_query_handler_routes_writes_to_its_read_only_database() -> None:
 
 @pytest.mark.django_db(databases=["default", "default_readonly"])
 def test_query_handler_cannot_use_an_explicit_writer_queryset() -> None:
+    """Given a query handler. When it selects the writer explicitly. Then execution is rejected."""
+
     class ExampleQueryHandler(QueryHandler[object, ExampleViewModel]):
         def handle(self, query: object) -> ExampleViewModel:
             return ExampleViewModel(
@@ -87,6 +97,8 @@ def test_query_handler_cannot_use_an_explicit_writer_queryset() -> None:
 
 @pytest.mark.django_db(databases=["default", "default_readonly"])
 def test_query_handler_cannot_use_the_writer_connection_directly() -> None:
+    """Given a query handler. When it opens the writer connection. Then execution is rejected."""
+
     class ExampleQueryHandler(QueryHandler[object, ExampleViewModel]):
         def handle(self, query: object) -> ExampleViewModel:
             with connections["default"].cursor() as cursor:
@@ -102,6 +114,8 @@ def test_query_handler_cannot_use_the_writer_connection_directly() -> None:
 def test_query_handler_does_not_open_its_database_without_an_orm_query(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Given a query without ORM work. When handled. Then no database connection is opened."""
+
     ensure_connection = MagicMock(side_effect=AssertionError("unexpected database connection"))
     monkeypatch.setattr(
         connections["default_readonly"],
@@ -122,6 +136,8 @@ def test_query_handler_does_not_open_its_database_without_an_orm_query(
     transaction=True,
 )
 def test_query_handler_can_run_inside_a_command_transaction() -> None:
+    """Given an atomic command. When it invokes a query. Then the read-only connection is used."""
+
     class ExampleQueryHandler(QueryHandler[object, ExampleViewModel]):
         def handle(self, query: object) -> ExampleViewModel:
             return ExampleViewModel(
@@ -140,6 +156,8 @@ def test_query_handler_can_run_inside_a_command_transaction() -> None:
 
 
 def test_query_handler_restores_database_routing_after_an_exception() -> None:
+    """Given a failing query. When handling exits. Then the previous routing context is restored."""
+
     class ExampleError(Exception):
         pass
 
@@ -157,6 +175,8 @@ def test_query_handler_restores_database_routing_after_an_exception() -> None:
 def test_query_handler_returns_a_materialized_view_model(
     django_assert_num_queries: Any,
 ) -> None:
+    """Given a query result. When accessed after handling. Then it performs no deferred queries."""
+
     class ExampleQueryHandler(QueryHandler[object, ExampleViewModel]):
         def handle(self, query: object) -> ExampleViewModel:
             return ExampleViewModel(
@@ -174,6 +194,8 @@ def test_query_handler_returns_a_materialized_view_model(
 
 
 def test_application_handlers_and_view_models_follow_the_contract() -> None:
+    """Given application code. When its AST is checked. Then handler contracts are enforced."""
+
     apps_path = Path(__file__).parents[2] / "apps"
     sources: list[tuple[str, str, str | None]] = [
         (

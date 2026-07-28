@@ -3,6 +3,8 @@ from pathlib import Path
 
 
 def test_application_import_style_respects_module_boundaries() -> None:
+    """Given application imports. When their AST is checked. Then module boundaries are enforced."""
+
     backend_path = Path(__file__).parents[2]
     apps_path = backend_path / "apps"
     sources: list[tuple[str, Path, str, str | None]] = [
@@ -42,6 +44,42 @@ def test_application_import_style_respects_module_boundaries() -> None:
                 None,
             ),
             (
+                "valid-command-to-command",
+                Path("apps/orders/commands/order_create_command.py"),
+                "from apps.users.commands import UserCreateCommand",
+                None,
+            ),
+            (
+                "valid-query-to-query",
+                Path("apps/orders/queries/order_get_query.py"),
+                "from apps.users.queries import UserGetQuery",
+                None,
+            ),
+            (
+                "invalid-command-to-private-layer",
+                Path("apps/orders/commands/order_create_command.py"),
+                "from apps.users.models import UserModel",
+                "cross-module import must use an allowed public package",
+            ),
+            (
+                "invalid-command-to-query-implementation",
+                Path("apps/orders/commands/order_create_command.py"),
+                "from apps.users.queries.user_get_query import UserGetQuery",
+                "cross-module import must use an allowed public package",
+            ),
+            (
+                "invalid-query-to-command",
+                Path("apps/orders/queries/order_get_query.py"),
+                "from apps.users.commands import UserCreateCommand",
+                "cross-module import must use an allowed public package",
+            ),
+            (
+                "invalid-view-to-other-module",
+                Path("apps/orders/views/order_list_view.py"),
+                "from apps.users.queries import UserGetQuery",
+                "cross-module imports are forbidden from this layer",
+            ),
+            (
                 "invalid-cross-module-relative",
                 Path("apps/orders/commands/order_create_command.py"),
                 "from ...users.queries import UserGetQuery",
@@ -63,40 +101,58 @@ def test_application_import_style_respects_module_boundaries() -> None:
     )
 
     unexpected_violations: list[str] = []
+    allowed_cross_module_imports = {
+        "commands": {"commands", "queries"},
+        "queries": {"queries"},
+    }
 
     for label, path, source, expected_violation in sources:
         current_module = path.parts[1]
         current_package = list(path.parent.parts)
+        source_layer = path.parts[2] if len(path.parts) > 3 else ""
         violations: list[str] = []
 
         for node in ast.walk(ast.parse(source)):
+            node_lineno = node.lineno if isinstance(node, (ast.Import, ast.ImportFrom)) else 0
+            absolute_imports: list[list[str]] = []
             if isinstance(node, ast.Import):
-                for imported_name in node.names:
-                    imported_parts = imported_name.name.split(".")
-                    if imported_parts[:2] == ["apps", current_module]:
-                        violations.append(
-                            f"{label}:{node.lineno}: imports from its own module must be relative"
-                        )
-                continue
-
-            if not isinstance(node, ast.ImportFrom):
-                continue
-
-            if node.level == 0:
+                absolute_imports = [imported_name.name.split(".") for imported_name in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.level == 0:
                 imported_parts = node.module.split(".") if node.module else []
-                imported_modules = (
-                    [imported_parts[1]]
-                    if len(imported_parts) > 1 and imported_parts[0] == "apps"
-                    else [
-                        imported_name.name.split(".", maxsplit=1)[0] for imported_name in node.names
+                absolute_imports = (
+                    [
+                        ["apps", imported_name.name.split(".", maxsplit=1)[0]]
+                        for imported_name in node.names
                     ]
                     if imported_parts == ["apps"]
-                    else []
+                    else [imported_parts]
                 )
-                if current_module in imported_modules:
+
+            for imported_parts in absolute_imports:
+                if len(imported_parts) < 2 or imported_parts[0] != "apps":
+                    continue
+
+                imported_module = imported_parts[1]
+                if imported_module == current_module:
                     violations.append(
-                        f"{label}:{node.lineno}: imports from its own module must be relative"
+                        f"{label}:{node_lineno}: imports from its own module must be relative"
                     )
+                    continue
+
+                if source_layer not in allowed_cross_module_imports:
+                    violations.append(
+                        f"{label}:{node_lineno}: cross-module imports are forbidden from this layer"
+                    )
+                    continue
+
+                target_layer = imported_parts[2] if len(imported_parts) == 3 else ""
+                if target_layer not in allowed_cross_module_imports[source_layer]:
+                    violations.append(
+                        f"{label}:{node_lineno}: "
+                        "cross-module import must use an allowed public package"
+                    )
+
+            if not isinstance(node, ast.ImportFrom) or node.level == 0:
                 continue
 
             parent_count = node.level - 1
