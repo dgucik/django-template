@@ -53,8 +53,8 @@ line-ending = "auto"
 
 [tool.mypy]
 python_version = "3.13"
-files = ["apps", "config", "core"]
-exclude = ["(^|/)migrations/"]
+files = ["."]
+exclude = ["(^|/)(migrations|\\.venv)/"]
 plugins = ["mypy_django_plugin.main"]
 check_untyped_defs = true
 no_implicit_optional = true
@@ -64,7 +64,7 @@ warn_unused_ignores = true
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 disallow_untyped_decorators = true
-strict=true
+strict = true
 
 [tool.django-stubs]
 django_settings_module = "config.settings"
