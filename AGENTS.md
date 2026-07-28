@@ -95,29 +95,39 @@ Keep all input, output, and handler types next to their use case:
 Each write use case has a command dataclass and a handler:
 
 ```python
+from core.handlers import CommandHandler
+
+
 @dataclass(frozen=True, slots=True)
 class OrderCreateCommand:
     customer_id: int
 
 
-class OrderCreateHandler:
-    @transaction.atomic
+class OrderCreateHandler(CommandHandler[OrderCreateCommand]):
     def handle(self, command: OrderCreateCommand) -> None:
         ...
 ```
 
 - Commands contain input data only.
-- Handlers implement one use case and always return `None`.
-- The complete use case runs inside `transaction.atomic`.
+- Handlers inherit directly from `CommandHandler`, expose only the synchronous
+  public method `handle`, and always return `None`.
+- `CommandHandler` wraps the complete use case in `transaction.atomic` on its
+  `database_alias` (`default` unless explicitly overridden).
+- A command writes to one database alias only. Do not attempt distributed
+  transactions; coordinate cross-database work with an outbox or events.
 - Use local models, selectors, services, and factories.
 - Call other modules only through their commands or queries.
-- Schedule irreversible side effects with `transaction.on_commit()`.
+- Schedule irreversible side effects with `transaction.on_commit()` using the
+  command's database alias.
 
 ## Queries
 
 Each read use case has a query, view model, and handler:
 
 ```python
+from core.handlers import QueryHandler
+
+
 @dataclass(frozen=True, slots=True)
 class OrderGetQuery:
     order_id: int
@@ -128,13 +138,22 @@ class OrderGetViewModel:
     id: int
 
 
-class OrderGetHandler:
+class OrderGetHandler(QueryHandler[OrderGetQuery, OrderGetViewModel]):
     def handle(self, query: OrderGetQuery) -> OrderGetViewModel:
         ...
 ```
 
-- Queries never write or call commands.
-- Return immutable view models, not Django models.
+- Query handlers inherit directly from `QueryHandler` and expose only the
+  synchronous public method `handle`.
+- Queries never write or call commands. The ORM is routed to the handler's
+  read-only database alias (`default_readonly` by default).
+- Never bypass read-only routing with `.using("default")`, `connection`, or
+  `connections["default"]`.
+- PostgreSQL permissions are the write-prevention boundary. Configure a distinct
+  read-only login role and revoke execution of unaudited application functions.
+- Return local view models defined as `@dataclass(frozen=True, slots=True)`.
+- Fully materialize results inside `handle`. View-model fields cannot contain
+  Django models, querysets, managers, iterators, `Any`, or mutable collections.
 - Use local models, selectors, services, and factories.
 - Read other modules only through their queries.
 - Avoid N+1 queries.
@@ -163,6 +182,11 @@ Prefer one aggregate per module.
 ## Code quality
 
 - Use Python 3.13, complete type annotations, mypy strict, and Ruff.
+- Write tests as pytest functions and use `pytest-django` for database access.
+- Handler and view-model architecture constraints are enforced by
+  `core/tests/test_handlers.py`; database permissions are verified by
+  `core/tests/test_handlers_sqlite.py` and
+  `core/tests/test_handlers_postgresql.py`.
 - Follow the `Entity + Action + Layer` naming convention.
 - Avoid generic `Service`, `Manager`, and `utils.py` abstractions.
 - Add tests for handlers, aggregate invariants, and bug fixes.
@@ -180,7 +204,7 @@ uv run mypy .
 uv run lint-imports
 uv run python manage.py check
 uv run python manage.py makemigrations --check --dry-run
-uv run python manage.py test
+uv run pytest
 ```
 
 Report checks that could not be run or did not pass.

@@ -9,6 +9,8 @@ dependencies = [
     "django-cors-headers>=4.9.0",
     "djangorestframework>=3.17.1",
     "dotenv>=0.9.9",
+    "gunicorn>=26.0.0",
+    "psycopg[binary]>=3.2.0",
 ]
 
 [dependency-groups]
@@ -18,7 +20,18 @@ dev = [
     "import-linter>=2.6.0",
     "mypy>=1.15.0,<2.0.0",
     "pre-commit>=4.2.0",
+    "pytest>=9.0.0",
+    "pytest-django>=4.11.0",
     "ruff>=0.12.0",
+]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py"]
+addopts = '-m "not postgresql"'
+markers = [
+    "postgresql: tests that verify PostgreSQL-specific database permissions",
+    "sqlite: tests that verify SQLite-specific database permissions",
 ]
 
 [tool.ruff]
@@ -73,7 +86,7 @@ containers = [
 ]
 layers = [
     "urls",
-    "views",
+    "(views)",
     "(commands)",
     "(queries)",
     "(selectors)",

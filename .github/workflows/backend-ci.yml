@@ -7,9 +7,11 @@ on:
       - develop
     paths:
       - "backend/**"
+      - "docker-compose.yml"
       - ".github/actions/setup-backend/**"
       - ".github/workflows/backend-ci.yml"
       - "scripts/ci/backend/**"
+      - "scripts/database/**"
 
   push:
     branches:
@@ -17,9 +19,11 @@ on:
       - develop
     paths:
       - "backend/**"
+      - "docker-compose.yml"
       - ".github/actions/setup-backend/**"
       - ".github/workflows/backend-ci.yml"
       - "scripts/ci/backend/**"
+      - "scripts/database/**"
 
 permissions:
   contents: read
@@ -89,6 +93,88 @@ jobs:
       - name: Import Linter
         run: uv run --locked lint-imports
 
+  tests:
+    name: Tests (SQLite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: backend
+
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings
+      DJANGO_SECRET_KEY: ci-not-secret
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-backend
+
+      - name: Pytest
+        run: uv run --locked pytest
+
+  postgresql-tests:
+    name: Tests (PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: app
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: backend
+
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings
+      DJANGO_SECRET_KEY: ci-not-secret
+      DJANGO_DB_ENGINE: django.db.backends.postgresql
+      DJANGO_DB_NAME: app
+      DJANGO_DB_USER: app_write
+      DJANGO_DB_PASSWORD: app-write-password
+      DJANGO_DB_HOST: 127.0.0.1
+      DJANGO_DB_PORT: "5432"
+      DJANGO_DB_READONLY_USER: app_readonly
+      DJANGO_DB_READONLY_PASSWORD: app-readonly-password
+      PGPASSWORD: postgres
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-backend
+
+      - name: Create PostgreSQL test database and roles
+        run: |
+          psql --host 127.0.0.1 --username postgres --dbname app \
+            --command "CREATE ROLE app_write LOGIN PASSWORD 'app-write-password' CREATEDB"
+          psql --host 127.0.0.1 --username postgres --dbname app \
+            --command "CREATE DATABASE test_app OWNER app_write"
+          psql --host 127.0.0.1 --username postgres --dbname test_app \
+            --variable readonly_user=app_readonly \
+            --variable readonly_password=app-readonly-password \
+            --variable owner_user=app_write \
+            --file ../scripts/database/postgresql_readonly_role.sql
+
+      - name: Pytest
+        run: uv run --locked pytest -o addopts= -m "not sqlite" --reuse-db
+
   migrations:
     name: Migration checks
     runs-on: ubuntu-latest
@@ -101,7 +187,7 @@ jobs:
 
     env:
       DJANGO_SETTINGS_MODULE: config.settings
-      SECRET_KEY: ci-not-secret
+      DJANGO_SECRET_KEY: ci-not-secret
 
     steps:
       - name: Checkout repository
