@@ -9,6 +9,10 @@ in `backend/apps/` is an independent business module.
 
 ```text
 apps/<module>/
+├── views/
+│   └── order_create_view.py
+├── serializers/
+│   └── order_create_serializer.py
 ├── commands/
 │   └── order_create_command.py  # command + handler
 ├── queries/
@@ -75,6 +79,9 @@ Examples:
 | Query | `OrderGetQuery` | `order_get_query.py` |
 | Query handler | `OrderGetHandler` | `order_get_query.py` |
 | View model | `OrderGetViewModel` | `order_get_query.py` |
+| View | `OrderCreateView` | `order_create_view.py` |
+| Input serializer | `OrderCreateInSerializer` | `order_create_serializer.py` |
+| Output serializer | `OrderCreateOutSerializer` | `order_create_serializer.py` |
 | Model | `OrderModel` | `order_model.py` |
 | Domain service | `OrderPricingService` | `order_pricing_service.py` |
 | Aggregate factory | `OrderCreateFactory` | `order_create_factory.py` |
@@ -82,7 +89,7 @@ Examples:
 Use the entity first, the action second, and the layer suffix last. Use
 `OrderCreateCommand`, never `CreateOrderCommand`. Models have no action segment
 but must keep the `Model` suffix. Framework files such as `admin.py`, `apps.py`,
-`urls.py`, `views.py`, `selectors.py`, migrations, and `__init__.py` are exceptions.
+`urls.py`, `selectors.py`, migrations, and `__init__.py` are exceptions.
 
 Keep all input, output, and handler types next to their use case:
 
@@ -157,6 +164,50 @@ class OrderGetHandler(QueryHandler[OrderGetQuery, OrderGetViewModel]):
 - Read other modules only through their queries.
 - Avoid N+1 queries.
 
+## Views and serializers
+
+Keep the HTTP layer inside the module that owns the endpoint:
+
+```text
+apps/orders/
+├── views/
+│   ├── order_create_view.py
+│   └── order_list_create_view.py
+└── serializers/
+    ├── order_create_serializer.py
+    └── order_list_serializer.py
+```
+
+- Put every view in the module's `views/` package and every serializer in its
+  `serializers/` package. Do not use module-level `views.py` or `serializers.py`.
+- Views inherit from `rest_framework.views.APIView` only. Django REST Framework
+  generic views, `ViewSet`, `ModelViewSet`, mixins, and similar abstractions are
+  forbidden.
+- Serializers inherit from `rest_framework.serializers.Serializer` only.
+  `ModelSerializer` and its subclasses are forbidden.
+- Name a view after its entity and supported action, followed by `View`.
+  For example, use `OrderCreateView` for a POST-only create endpoint and
+  `OrderListCreateView` for an `orders/` collection endpoint supporting GET and
+  POST.
+- Name serializers after the view action they serve and their data direction:
+  `<Entity><Action>InSerializer` for request data and
+  `<Entity><Action>OutSerializer` for response data. For example,
+  `OrderCreateInSerializer`, `OrderCreateOutSerializer`, and
+  `OrderListOutSerializer`.
+- A multi-method view uses the serializer matching each operation. For example,
+  `OrderListCreateView.get()` uses `OrderListOutSerializer`, while
+  `OrderListCreateView.post()` uses `OrderCreateInSerializer` and, when it
+  returns a body, `OrderCreateOutSerializer`.
+- Keep views thin. A view validates request data with an input serializer,
+  constructs a command or query, invokes its handler, serializes the result, and
+  returns the HTTP response. Views contain no business logic and perform no
+  direct ORM operations.
+- Views may invoke commands and queries only from their own module, imported
+  through that module's `commands` and `queries` package interfaces. They must
+  never invoke another module's commands or queries directly.
+- Serializers define the HTTP contract and validation only. They contain no
+  business logic, ORM operations, or handler calls.
+
 ## Aggregates
 
 Prefer one aggregate per module.
@@ -174,8 +225,6 @@ Prefer one aggregate per module.
 
 - Selectors are private, read-only Django ORM helpers without business rules.
 - Services and factories are private and must not become cross-module APIs.
-- Views and serializers validate input, call handlers, and map results.
-- Views and serializers do not contain business logic or direct ORM operations.
 - `backend/core/` contains only shared, domain-independent technical code.
 
 ## Code quality
