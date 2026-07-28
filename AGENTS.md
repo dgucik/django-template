@@ -239,6 +239,8 @@ Prefer one aggregate per module.
   `core/tests/test_handlers.py`; database permissions are verified by
   `core/tests/test_handlers_sqlite.py` and
   `core/tests/test_handlers_postgresql.py`.
+- Relative imports within a business module and absolute imports across module
+  boundaries are enforced by `core/tests/test_imports.py`.
 - Follow the `Entity + Action + Layer` naming convention.
 - Avoid generic `Service`, `Manager`, and `utils.py` abstractions.
 - Add tests for handlers, aggregate invariants, and bug fixes.
