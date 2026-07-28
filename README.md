@@ -25,6 +25,41 @@ uv run python manage.py makemigrations
 uv run python manage.py migrate
 ```
 
+## New module
+
+From the repository root:
+
+```bash
+./scripts/create_app.sh orders
+```
+
+Then add `"apps.orders"` to `INSTALLED_APPS` and include
+`apps.orders.urls` in the API URL configuration when the module exposes
+endpoints.
+
+Import Linter automatically checks every `apps.*` module for cycles and internal
+layer direction. Before importing between business modules, explicitly decide
+their dependency level: which modules may import the new module and which
+modules it may import. Encode that decision as an additional Import Linter
+contract in `backend/pyproject.toml`; do not rely only on documentation or an
+informal convention.
+
+For example, a layers contract ordered from highest to lowest:
+
+```toml
+[[tool.importlinter.contracts]]
+name = "Business module dependency levels"
+type = "layers"
+layers = [
+    "apps.checkout",
+    "apps.orders",
+    "apps.users",
+]
+```
+
+Here `checkout` may import `orders` and `users`, while `users` cannot import
+either module.
+
 ## Docker
 
 Docker Compose runs the production backend with Gunicorn and PostgreSQL.

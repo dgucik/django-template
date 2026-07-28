@@ -81,14 +81,14 @@ depth = 0
 [[tool.importlinter.contracts]]
 name = "App implementation follows presentation-to-domain dependency flow"
 type = "layers"
-containers = [
-    "apps.users",
-]
+containers = ["apps.*"]
 layers = [
     "urls",
     "(views)",
+    "(serializers)",
     "(commands)",
     "(queries)",
     "(selectors)",
+    "(services)",
     "models",
 ]

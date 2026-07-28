@@ -24,7 +24,8 @@ apps/<module>/
 └── selectors.py  # thin ORM read helpers
 ```
 
-Create optional directories only when needed.
+Use `scripts/create_app.sh` to create this standard module structure. Create
+additional optional directories only when needed.
 Use `selectors.py` by default; split it into a `selectors/` package only when it
 becomes too large to maintain clearly.
 
@@ -59,6 +60,9 @@ Rules:
 - Local commands and queries do not import each other.
 - Do not call another handler from the same command or query layer.
 - Keep the module dependency graph acyclic.
+- Before adding a cross-module import, define the modules' dependency level in
+  an explicit Import Linter contract. Document which modules may import the new
+  module and which modules the new module may import.
 - Resolve cycles by changing ownership or using events, never hidden imports.
 
 ## Naming
