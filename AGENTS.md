@@ -18,17 +18,16 @@ apps/<module>/
 │   └── order_get_query.py       # query + handler + DTO
 ├── models/ or models.py
 │   └── order_model.py
-├── factories/
-│   └── order_factory.py          # aggregate construction
+├── factories/ or factories.py    # aggregate construction
 └── services/ or services.py
     └── order_pricing_service.py  # domain logic outside the aggregate
 ```
 
 Use `scripts/create_app.sh` to create this standard module structure. The
 generated `factories/` and `services/` packages may remain empty until a use
-case needs them. `models` and `services` may each be a single `.py` module or a
-package; use a package when the module would become too large to maintain
-clearly.
+case needs them. `models`, `services`, and `factories` may each be a single
+`.py` module or a package; use a package when the module would become too large
+to maintain clearly.
 
 The immediate contents of every `apps/<module>/` directory are enforced by
 `core/tests/test_app_structure.py`. Add a common new layer or framework file to
@@ -307,7 +306,7 @@ Prefer one aggregate per module.
 - Other modules never import aggregate models.
 - Keep business rules in the aggregate whenever possible.
 - Add `services/` only for domain logic that does not belong to one model.
-- Add `factories/` only for non-trivial aggregate construction.
+- Add `factories/` or `factories.py` only for non-trivial aggregate construction.
 - Use-case orchestration belongs in handlers.
 - Do not use Django signals for cross-module workflows.
 

@@ -8,6 +8,7 @@ GLOBAL_ALLOWED_APP_ELEMENTS = frozenset(
         "commands",
         "exceptions.py",
         "factories",
+        "factories.py",
         "migrations",
         "models",
         "models.py",

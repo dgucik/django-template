@@ -14,7 +14,10 @@ def test_application_services_and_factories_use_static_methods() -> None:
         )
         for path in apps_path.rglob("*.py")
         if "migrations" not in path.parts
-        and (path.parent.name in {"factories", "services"} or path.name == "services.py")
+        and (
+            path.parent.name in {"factories", "services"}
+            or path.name in {"factories.py", "services.py"}
+        )
     ]
     sources.extend(
         [
