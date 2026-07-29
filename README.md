@@ -8,7 +8,7 @@ Development uses SQLite:
 
 ```bash
 cd backend
-cp .env.example .env
+cp .env.local.example .env
 uv sync --locked --group dev
 uv run python manage.py migrate
 uv run python manage.py createsuperuser
@@ -68,7 +68,7 @@ PostgreSQL roles and Django migrations are initialized automatically.
 From the repository root:
 
 ```bash
-cp backend/.env.example .env
+cp .env.docker.example .env
 ```
 
 Change all passwords and `DJANGO_SECRET_KEY` in `.env`, then run:
@@ -90,34 +90,9 @@ Delete containers and the local PostgreSQL data:
 docker compose down --volumes
 ```
 
-## Checks
+Quality gates, test ownership, and configuration changes are documented in
+[CODE_QUALITY.md](CODE_QUALITY.md).
 
-Run from `backend/`:
-
-```bash
-uv run ruff check .
-uv run ruff format --check .
-uv run mypy .
-uv run lint-imports
-uv run python manage.py check
-uv run python manage.py makemigrations --check --dry-run
-uv run pytest
-../scripts/ci/backend/mutation-test.sh
-```
-
-`mutmut` runs mutation testing against function and method bodies in
-`backend/apps/`. Tests colocated with business modules under `apps/` are
-executed but are not mutated. Architecture tests remain in the separate Import
-Linter and pytest checks because they inspect uninstrumented source code. The
-mutation check passes when every generated mutant is killed; it also handles a
-new project that does not contain any production functions yet. Inspect
-surviving or otherwise non-killed mutants with:
-
-```bash
-uv run mutmut run
-uv run mutmut results
-uv run mutmut browse
-```
-
-Mutation testing requires a system with `fork` support. On Windows, run it
-inside WSL.
+The command/query interface strategy for scaling, microservice extraction, and
+Django forms/templates is documented in
+[ARCHITECTURE_SCALING.md](ARCHITECTURE_SCALING.md).

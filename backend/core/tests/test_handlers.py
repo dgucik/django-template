@@ -12,7 +12,7 @@ from core.handlers import CommandHandler, QueryHandler, _query_database_alias
 
 
 @dataclass(frozen=True, slots=True)
-class ExampleViewModel:
+class ExampleDto:
     database_alias: str
     count: int
 
@@ -54,14 +54,14 @@ def test_command_handler_always_uses_the_default_database() -> None:
 def test_query_handler_routes_reads_to_its_declared_database() -> None:
     """Given a query handler. When it reads. Then it uses its declared database."""
 
-    class ExampleQueryHandler(QueryHandler[object, ExampleViewModel]):
-        def handle(self, query: object) -> ExampleViewModel:
-            return ExampleViewModel(
+    class ExampleQueryHandler(QueryHandler[object, ExampleDto]):
+        def handle(self, query: object) -> ExampleDto:
+            return ExampleDto(
                 database_alias=router.db_for_read(User),
                 count=User.objects.count(),
             )
 
-    assert ExampleQueryHandler().handle(object()) == ExampleViewModel(
+    assert ExampleQueryHandler().handle(object()) == ExampleDto(
         database_alias="default_readonly",
         count=0,
     )
@@ -70,9 +70,9 @@ def test_query_handler_routes_reads_to_its_declared_database() -> None:
 def test_query_handler_routes_writes_to_its_read_only_database() -> None:
     """Given a query handler. When ORM selects a writer. Then it receives the read-only alias."""
 
-    class ExampleQueryHandler(QueryHandler[object, ExampleViewModel]):
-        def handle(self, query: object) -> ExampleViewModel:
-            return ExampleViewModel(
+    class ExampleQueryHandler(QueryHandler[object, ExampleDto]):
+        def handle(self, query: object) -> ExampleDto:
+            return ExampleDto(
                 database_alias=router.db_for_write(User),
                 count=0,
             )
@@ -84,9 +84,9 @@ def test_query_handler_routes_writes_to_its_read_only_database() -> None:
 def test_query_handler_cannot_use_an_explicit_writer_queryset() -> None:
     """Given a query handler. When it selects the writer explicitly. Then execution is rejected."""
 
-    class ExampleQueryHandler(QueryHandler[object, ExampleViewModel]):
-        def handle(self, query: object) -> ExampleViewModel:
-            return ExampleViewModel(
+    class ExampleQueryHandler(QueryHandler[object, ExampleDto]):
+        def handle(self, query: object) -> ExampleDto:
+            return ExampleDto(
                 database_alias="default",
                 count=User.objects.using("default").count(),
             )
@@ -99,13 +99,13 @@ def test_query_handler_cannot_use_an_explicit_writer_queryset() -> None:
 def test_query_handler_cannot_use_the_writer_connection_directly() -> None:
     """Given a query handler. When it opens the writer connection. Then execution is rejected."""
 
-    class ExampleQueryHandler(QueryHandler[object, ExampleViewModel]):
-        def handle(self, query: object) -> ExampleViewModel:
+    class ExampleQueryHandler(QueryHandler[object, ExampleDto]):
+        def handle(self, query: object) -> ExampleDto:
             with connections["default"].cursor() as cursor:
                 cursor.execute("SELECT COUNT(*) FROM users_user")
                 row = cursor.fetchone()
             assert row is not None
-            return ExampleViewModel(database_alias="default", count=row[0])
+            return ExampleDto(database_alias="default", count=row[0])
 
     with pytest.raises(RuntimeError, match="cannot use the default database"):
         ExampleQueryHandler().handle(object())
@@ -123,9 +123,9 @@ def test_query_handler_does_not_open_its_database_without_an_orm_query(
         ensure_connection,
     )
 
-    class ExampleQueryHandler(QueryHandler[object, ExampleViewModel]):
-        def handle(self, query: object) -> ExampleViewModel:
-            return ExampleViewModel(database_alias=self.database_alias, count=0)
+    class ExampleQueryHandler(QueryHandler[object, ExampleDto]):
+        def handle(self, query: object) -> ExampleDto:
+            return ExampleDto(database_alias=self.database_alias, count=0)
 
     assert ExampleQueryHandler().handle(object()).count == 0
     ensure_connection.assert_not_called()
@@ -138,9 +138,9 @@ def test_query_handler_does_not_open_its_database_without_an_orm_query(
 def test_query_handler_can_run_inside_a_command_transaction() -> None:
     """Given an atomic command. When it invokes a query. Then the read-only connection is used."""
 
-    class ExampleQueryHandler(QueryHandler[object, ExampleViewModel]):
-        def handle(self, query: object) -> ExampleViewModel:
-            return ExampleViewModel(
+    class ExampleQueryHandler(QueryHandler[object, ExampleDto]):
+        def handle(self, query: object) -> ExampleDto:
+            return ExampleDto(
                 database_alias=router.db_for_read(User),
                 count=User.objects.count(),
             )
@@ -161,8 +161,8 @@ def test_query_handler_restores_database_routing_after_an_exception() -> None:
     class ExampleError(Exception):
         pass
 
-    class ExampleQueryHandler(QueryHandler[object, ExampleViewModel]):
-        def handle(self, query: object) -> ExampleViewModel:
+    class ExampleQueryHandler(QueryHandler[object, ExampleDto]):
+        def handle(self, query: object) -> ExampleDto:
             assert _query_database_alias.get() == "default_readonly"
             raise ExampleError
 
@@ -172,14 +172,14 @@ def test_query_handler_restores_database_routing_after_an_exception() -> None:
 
 
 @pytest.mark.django_db(databases=["default", "default_readonly"])
-def test_query_handler_returns_a_materialized_view_model(
+def test_query_handler_returns_a_materialized_dto(
     django_assert_num_queries: Any,
 ) -> None:
     """Given a query result. When accessed after handling. Then it performs no deferred queries."""
 
-    class ExampleQueryHandler(QueryHandler[object, ExampleViewModel]):
-        def handle(self, query: object) -> ExampleViewModel:
-            return ExampleViewModel(
+    class ExampleQueryHandler(QueryHandler[object, ExampleDto]):
+        def handle(self, query: object) -> ExampleDto:
+            return ExampleDto(
                 database_alias=router.db_for_read(User),
                 count=User.objects.count(),
             )
@@ -193,8 +193,8 @@ def test_query_handler_returns_a_materialized_view_model(
         }
 
 
-def test_application_handlers_and_view_models_follow_the_contract() -> None:
-    """Given application code. When its AST is checked. Then handler contracts are enforced."""
+def test_application_handlers_and_dtos_follow_the_contract() -> None:
+    """Given application code. When its AST is checked. Then handler and DTO contracts hold."""
 
     apps_path = Path(__file__).parents[2] / "apps"
     sources: list[tuple[str, str, str | None]] = [
@@ -212,11 +212,11 @@ def test_application_handlers_and_view_models_follow_the_contract() -> None:
                 "valid",
                 """
 @dataclass(frozen=True, slots=True)
-class OrderGetViewModel:
+class OrderGetDto:
     id: int
 
-class OrderGetHandler(QueryHandler[OrderGetQuery, OrderGetViewModel]):
-    def handle(self, query: OrderGetQuery) -> OrderGetViewModel:
+class OrderGetHandler(QueryHandler[OrderGetQuery, OrderGetDto]):
+    def handle(self, query: OrderGetQuery) -> OrderGetDto:
         ...
 """,
                 None,
@@ -245,8 +245,8 @@ class OrderCreateHandler(CommandHandler[OrderCreateCommand]):
             (
                 "async-handler",
                 """
-class OrderGetHandler(QueryHandler[OrderGetQuery, OrderGetViewModel]):
-    async def handle(self, query: OrderGetQuery) -> OrderGetViewModel:
+class OrderGetHandler(QueryHandler[OrderGetQuery, OrderGetDto]):
+    async def handle(self, query: OrderGetQuery) -> OrderGetDto:
         ...
 """,
                 "handle must be synchronous",
@@ -254,8 +254,8 @@ class OrderGetHandler(QueryHandler[OrderGetQuery, OrderGetViewModel]):
             (
                 "handler-mixin",
                 """
-class OrderGetHandler(LoggingMixin, QueryHandler[OrderGetQuery, OrderGetViewModel]):
-    def handle(self, query: OrderGetQuery) -> OrderGetViewModel:
+class OrderGetHandler(LoggingMixin, QueryHandler[OrderGetQuery, OrderGetDto]):
+    def handle(self, query: OrderGetQuery) -> OrderGetDto:
         ...
 """,
                 "must inherit directly",
@@ -263,8 +263,8 @@ class OrderGetHandler(LoggingMixin, QueryHandler[OrderGetQuery, OrderGetViewMode
             (
                 "handler-without-suffix",
                 """
-class OrderProcessor(QueryHandler[OrderGetQuery, OrderGetViewModel]):
-    def handle(self, query: OrderGetQuery) -> OrderGetViewModel:
+class OrderProcessor(QueryHandler[OrderGetQuery, OrderGetDto]):
+    def handle(self, query: OrderGetQuery) -> OrderGetDto:
         ...
 """,
                 "must use the Handler suffix",
@@ -276,22 +276,22 @@ class OrderGetHandler(QueryHandler[OrderGetQuery, list[int]]):
     def handle(self, query: OrderGetQuery) -> list[int]:
         ...
 """,
-                "must use a local ViewModel result",
+                "must use a local DTO result",
             ),
             (
-                "invalid-view-model",
+                "invalid-dto",
                 """
 @dataclass(frozen=True)
-class OrderGetViewModel:
+class OrderGetDto:
     orders: QuerySet[OrderModel]
 """,
                 "must be a frozen, slotted dataclass",
             ),
             (
-                "lazy-view-model-field",
+                "lazy-dto-field",
                 """
 @dataclass(frozen=True, slots=True)
-class OrderGetViewModel:
+class OrderGetDto:
     orders: QuerySet[OrderModel]
 """,
                 "has forbidden field types",
@@ -302,7 +302,7 @@ class OrderGetViewModel:
 from apps.users import models
 
 @dataclass(frozen=True, slots=True)
-class UserGetViewModel:
+class UserGetDto:
     user: models.User
 """,
                 "has forbidden field types",
@@ -310,8 +310,8 @@ class UserGetViewModel:
             (
                 "mismatched-return",
                 """
-class OrderGetHandler(QueryHandler[OrderGetQuery, OrderGetViewModel]):
-    def handle(self, query: OrderGetQuery) -> OtherViewModel:
+class OrderGetHandler(QueryHandler[OrderGetQuery, OrderGetDto]):
+    def handle(self, query: OrderGetQuery) -> OtherDto:
         ...
 """,
                 "return annotation must match",
@@ -352,10 +352,10 @@ class OrderGetHandler(QueryHandler[OrderGetQuery, OrderGetViewModel]):
     for label, source, expected_violation in sources:
         tree = ast.parse(source)
         violations: list[str] = []
-        local_view_model_names = {
+        local_dto_names = {
             node.name
             for node in tree.body
-            if isinstance(node, ast.ClassDef) and node.name.endswith("ViewModel")
+            if isinstance(node, ast.ClassDef) and node.name.endswith("Dto")
         }
         imported_model_names = {
             alias.asname or alias.name
@@ -384,7 +384,7 @@ class OrderGetHandler(QueryHandler[OrderGetQuery, OrderGetViewModel]):
             if not isinstance(node, ast.ClassDef):
                 continue
 
-            if node.name.endswith("ViewModel"):
+            if node.name.endswith("Dto"):
                 dataclass_decorator = next(
                     (
                         decorator
@@ -443,7 +443,7 @@ class OrderGetHandler(QueryHandler[OrderGetQuery, OrderGetViewModel]):
                         or annotation_name.endswith(("Manager", "QuerySet"))
                         or (
                             annotation_name.endswith("Model")
-                            and not annotation_name.endswith("ViewModel")
+                            and not annotation_name.endswith("Dto")
                         )
                     }
                     invalid_names.update(annotation_model_modules & imported_model_modules)
@@ -559,13 +559,11 @@ class OrderGetHandler(QueryHandler[OrderGetQuery, OrderGetViewModel]):
                         else ""
                     )
             if (
-                result_name == "ViewModel"
-                or not result_name.endswith("ViewModel")
-                or result_name not in local_view_model_names
+                result_name == "Dto"
+                or not result_name.endswith("Dto")
+                or result_name not in local_dto_names
             ):
-                violations.append(
-                    f"{label}:{node.lineno}: {node.name} must use a local ViewModel result"
-                )
+                violations.append(f"{label}:{node.lineno}: {node.name} must use a local DTO result")
 
             return_name = (
                 handle.returns.id

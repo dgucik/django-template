@@ -8,6 +8,7 @@ dependencies = [
     "django>=6.0.6",
     "django-cors-headers>=4.9.0",
     "djangorestframework>=3.17.1",
+    "djangorestframework-dataclasses>=1.4.0",
     "dotenv>=0.9.9",
     "gunicorn>=26.0.0",
     "psycopg[binary]>=3.2.0",
@@ -48,13 +49,17 @@ line-length = 100
 extend-exclude = ["migrations", "mutants"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "DJ", "RUF", "D"]
+select = ["E", "F", "I", "UP", "B", "C90", "SIM", "DJ", "RUF", "D"]
 ignore = ["D100", "D104"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
 
 [tool.ruff.lint.per-file-ignores]
 "config/settings/__init__.py" = ["F401"]
 "apps/custom_fields/models.py" = ["DJ001", "RUF012"]
-"**/tests/**" = ["D"]
+"core/contracts.py" = ["B024"]
+"**/tests/**" = ["D", "C901"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -98,10 +103,9 @@ containers = ["apps.*"]
 layers = [
     "urls",
     "(views)",
-    "(serializers)",
     "(commands)",
     "(queries)",
-    "(selectors)",
     "(services)",
+    "(factories)",
     "models",
 ]

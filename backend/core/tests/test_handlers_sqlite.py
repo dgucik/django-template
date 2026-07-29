@@ -12,7 +12,7 @@ pytestmark = pytest.mark.sqlite
 
 
 @dataclass(frozen=True, slots=True)
-class SQLiteResultViewModel:
+class SQLiteResultDto:
     value: str
 
 
@@ -40,12 +40,12 @@ def test_query_handler_cannot_write_to_a_read_only_sqlite_connection(
     with test_connections["default"].cursor() as cursor:
         cursor.execute("CREATE TABLE example (value TEXT NOT NULL)")
 
-    class ExampleCreateHandler(QueryHandler[object, SQLiteResultViewModel]):
-        def handle(self, query: object) -> SQLiteResultViewModel:
+    class ExampleCreateHandler(QueryHandler[object, SQLiteResultDto]):
+        def handle(self, query: object) -> SQLiteResultDto:
             database_alias = router.db_for_write(User)
             with test_connections[database_alias].cursor() as cursor:
                 cursor.execute("INSERT INTO example (value) VALUES ('forbidden')")
-            return SQLiteResultViewModel(value="unreachable")
+            return SQLiteResultDto(value="unreachable")
 
     try:
         with pytest.raises(OperationalError, match="attempt to write a readonly database"):

@@ -23,7 +23,8 @@ ENV/
 # Environment variables
 .env
 .env.*
-!.env.example
+!.env.docker.example
+!backend/.env.local.example
 
 # Celery
 celerybeat-schedule

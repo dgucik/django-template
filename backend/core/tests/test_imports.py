@@ -190,3 +190,50 @@ def test_application_imports_respect_boundaries_and_public_interfaces() -> None:
             )
 
     assert not unexpected_violations, "\n".join(unexpected_violations)
+
+
+def test_public_command_and_query_types_are_reexported() -> None:
+    """Given public use-case types. When inspected. Then package interfaces re-export them."""
+
+    apps_path = Path(__file__).parents[2] / "apps"
+    violations: list[str] = []
+    public_suffixes = {
+        "commands": ("Command", "Handler"),
+        "queries": ("Query", "Handler", "Dto"),
+    }
+
+    for module_path in apps_path.iterdir():
+        if not module_path.is_dir() or module_path.name == "__pycache__":
+            continue
+
+        for layer, suffixes in public_suffixes.items():
+            layer_path = module_path / layer
+            if not layer_path.is_dir():
+                continue
+
+            reexports_path = layer_path / "__init__.py"
+            reexported_names = {
+                alias.asname or alias.name
+                for node in ast.walk(ast.parse(reexports_path.read_text()))
+                if isinstance(node, ast.ImportFrom) and node.level == 1
+                for alias in node.names
+            }
+            for implementation_path in layer_path.glob("*.py"):
+                if implementation_path.name == "__init__.py":
+                    continue
+
+                public_names = {
+                    node.name
+                    for node in ast.walk(ast.parse(implementation_path.read_text()))
+                    if isinstance(node, ast.ClassDef)
+                    and not node.name.startswith("_")
+                    and node.name.endswith(suffixes)
+                }
+                missing_reexports = sorted(public_names - reexported_names)
+                if missing_reexports:
+                    violations.append(
+                        f"apps.{module_path.name}.{layer}: missing re-exports: "
+                        f"{', '.join(missing_reexports)}"
+                    )
+
+    assert not violations, "\n".join(violations)

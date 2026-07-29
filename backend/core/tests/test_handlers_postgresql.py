@@ -17,12 +17,12 @@ pytestmark = [
 
 
 @dataclass(frozen=True, slots=True)
-class PostgreSQLResultViewModel:
+class PostgreSQLResultDto:
     value: str
 
 
 @dataclass(frozen=True, slots=True)
-class PostgreSQLPermissionViewModel:
+class PostgreSQLPermissionDto:
     allowed: bool
 
 
@@ -30,14 +30,14 @@ class PostgreSQLPermissionViewModel:
 def test_query_handler_connects_as_the_dedicated_read_only_role() -> None:
     """Given PostgreSQL. When a query connects. Then it uses the dedicated read-only role."""
 
-    class CurrentUserGetHandler(QueryHandler[object, PostgreSQLResultViewModel]):
-        def handle(self, query: object) -> PostgreSQLResultViewModel:
+    class CurrentUserGetHandler(QueryHandler[object, PostgreSQLResultDto]):
+        def handle(self, query: object) -> PostgreSQLResultDto:
             database_alias = router.db_for_read(User)
             with connections[database_alias].cursor() as cursor:
                 cursor.execute("SELECT current_user")
                 row = cursor.fetchone()
             assert row is not None
-            return PostgreSQLResultViewModel(value=row[0])
+            return PostgreSQLResultDto(value=row[0])
 
     assert (
         CurrentUserGetHandler().handle(object()).value
@@ -50,9 +50,9 @@ def test_query_handler_role_cannot_create_temporary_tables() -> None:
     """Given the read-only role. When privileges are checked. Then temporary tables are denied."""
 
     class TemporaryPermissionGetHandler(
-        QueryHandler[object, PostgreSQLPermissionViewModel],
+        QueryHandler[object, PostgreSQLPermissionDto],
     ):
-        def handle(self, query: object) -> PostgreSQLPermissionViewModel:
+        def handle(self, query: object) -> PostgreSQLPermissionDto:
             database_alias = router.db_for_read(User)
             with connections[database_alias].cursor() as cursor:
                 cursor.execute(
@@ -60,7 +60,7 @@ def test_query_handler_role_cannot_create_temporary_tables() -> None:
                 )
                 row = cursor.fetchone()
             assert row is not None
-            return PostgreSQLPermissionViewModel(allowed=row[0])
+            return PostgreSQLPermissionDto(allowed=row[0])
 
     assert not TemporaryPermissionGetHandler().handle(object()).allowed
 
@@ -69,10 +69,10 @@ def test_query_handler_role_cannot_create_temporary_tables() -> None:
 def test_query_handler_cannot_write_through_the_orm() -> None:
     """Given a query handler. When the ORM attempts a write. Then PostgreSQL rejects it."""
 
-    class UserCreateHandler(QueryHandler[object, PostgreSQLResultViewModel]):
-        def handle(self, query: object) -> PostgreSQLResultViewModel:
+    class UserCreateHandler(QueryHandler[object, PostgreSQLResultDto]):
+        def handle(self, query: object) -> PostgreSQLResultDto:
             User.objects.create(username="forbidden-query-write")
-            return PostgreSQLResultViewModel(value="unreachable")
+            return PostgreSQLResultDto(value="unreachable")
 
     with pytest.raises(DatabaseError, match=r"permission denied|read-only"):
         UserCreateHandler().handle(object())
@@ -85,9 +85,9 @@ def test_query_handler_allows_a_common_table_expression() -> None:
     """Given a read-only connection. When a CTE is selected. Then PostgreSQL returns its result."""
 
     class CommonTableExpressionGetHandler(
-        QueryHandler[object, PostgreSQLResultViewModel],
+        QueryHandler[object, PostgreSQLResultDto],
     ):
-        def handle(self, query: object) -> PostgreSQLResultViewModel:
+        def handle(self, query: object) -> PostgreSQLResultDto:
             database_alias = router.db_for_read(User)
             with connections[database_alias].cursor() as cursor:
                 cursor.execute(
@@ -95,7 +95,7 @@ def test_query_handler_allows_a_common_table_expression() -> None:
                 )
                 row = cursor.fetchone()
             assert row is not None
-            return PostgreSQLResultViewModel(value=row[0])
+            return PostgreSQLResultDto(value=row[0])
 
     assert CommonTableExpressionGetHandler().handle(object()).value == "allowed"
 
@@ -121,13 +121,13 @@ def test_query_handler_cannot_execute_an_ungranted_security_definer_function() -
         )
 
     class DangerousFunctionGetHandler(
-        QueryHandler[object, PostgreSQLResultViewModel],
+        QueryHandler[object, PostgreSQLResultDto],
     ):
-        def handle(self, query: object) -> PostgreSQLResultViewModel:
+        def handle(self, query: object) -> PostgreSQLResultDto:
             database_alias = router.db_for_read(User)
             with connections[database_alias].cursor() as cursor:
                 cursor.execute("SELECT public.query_test_dangerous_function()")
-            return PostgreSQLResultViewModel(value="unreachable")
+            return PostgreSQLResultDto(value="unreachable")
 
     try:
         with pytest.raises(DatabaseError, match="permission denied for function"):
