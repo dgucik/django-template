@@ -379,8 +379,11 @@ domain objects.
   `core/tests/test_handlers.py`; database permissions are verified by
   `core/tests/test_handlers_sqlite.py` and
   `core/tests/test_handlers_postgresql.py`.
+- Every model under `backend/apps/` must inherit from `core.models.BaseModel`;
+  this is enforced by `core/tests/test_models.py`.
 - Relative imports within a business module and absolute imports across module
-  boundaries are enforced by `core/tests/test_imports.py`.
+  boundaries, including the rule that only `commands` and `queries` are public
+  module interfaces, are enforced by `core/tests/test_imports.py`.
 - Mutation testing with `mutmut` covers function and method bodies under
   `backend/apps/`. Tests colocated in `apps/` participate in mutation runs but
   are not mutated. Architecture tests run separately against uninstrumented

@@ -2,8 +2,8 @@ import ast
 from pathlib import Path
 
 
-def test_application_import_style_respects_module_boundaries() -> None:
-    """Given application imports. When their AST is checked. Then module boundaries are enforced."""
+def test_application_imports_respect_boundaries_and_public_interfaces() -> None:
+    """Given app imports. When checked. Then only commands and queries are public interfaces."""
 
     backend_path = Path(__file__).parents[2]
     apps_path = backend_path / "apps"
@@ -59,6 +59,12 @@ def test_application_import_style_respects_module_boundaries() -> None:
                 "invalid-command-to-private-layer",
                 Path("apps/orders/commands/order_create_command.py"),
                 "from apps.users.models import UserModel",
+                "cross-module import must use an allowed public package",
+            ),
+            (
+                "invalid-module-root-interface",
+                Path("apps/orders/commands/order_create_command.py"),
+                "from apps.users import UserModel",
                 "cross-module import must use an allowed public package",
             ),
             (
