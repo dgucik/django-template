@@ -135,9 +135,6 @@ class OrderCreateHandler(CommandHandler[OrderCreateCommand]):
   `default`.
 - A command writes to the `default` database only. Do not attempt distributed
   transactions; coordinate cross-database work with an outbox or events.
-- Commands that act on protected data include the authenticated actor in their
-  input and verify authorization and permissions inside the handler before any
-  write or irreversible side effect.
 - Use local models, services, and factories. Perform ORM writes directly in the
   handler; do not add a selector layer.
 - Call other modules only through their commands or queries.
@@ -177,9 +174,6 @@ class OrderGetHandler(QueryHandler[OrderGetQuery, OrderGetDto]):
   `connections["default"]`.
 - PostgreSQL permissions are the write-prevention boundary. Configure a distinct
   read-only login role and revoke execution of unaudited application functions.
-- Queries that return protected data include the authenticated actor in their
-  input and verify authorization and permissions inside the handler before
-  reading or projecting any protected data.
 - Return local DTOs defined as `@dataclass(frozen=True, slots=True)` and
   inheriting from `core.contracts.Dto`. A DTO is a Data Transfer Object: the
   serializable internal interface of a query.

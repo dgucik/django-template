@@ -42,9 +42,8 @@ lazy ORM objects.
 ## Base: wrappers preserve the use-case boundary
 
 A wrapper is a thin adapter around a public command or query interface. It
-authenticates the caller, validates and maps input, invokes the use case, and
-maps its result to the transport. The command or query handler then enforces
-domain authorization and permissions. Neither layer bypasses the interface.
+validates and maps input, invokes the use case, and maps its result to the
+transport. It contains no business rules and never bypasses the interface.
 
 The same use case can have many wrappers:
 

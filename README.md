@@ -96,3 +96,6 @@ Quality gates, test ownership, and configuration changes are documented in
 The command/query interface strategy for scaling, microservice extraction, and
 Django forms/templates is documented in
 [ARCHITECTURE_SCALING.md](ARCHITECTURE_SCALING.md).
+
+A complete command, business query, aggregate, service, factory, and view
+walkthrough is available in [ARCHITECTURE_EXAMPLES.md](ARCHITECTURE_EXAMPLES.md).
