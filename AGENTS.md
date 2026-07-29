@@ -244,6 +244,10 @@ Prefer one aggregate per module.
   `core/tests/test_handlers_postgresql.py`.
 - Relative imports within a business module and absolute imports across module
   boundaries are enforced by `core/tests/test_imports.py`.
+- Mutation testing with `mutmut` covers function and method bodies under
+  `backend/apps/`. Tests colocated in `apps/` participate in mutation runs but
+  are not mutated. Architecture tests run separately against uninstrumented
+  source code. New or changed business behavior must kill its mutants.
 - Follow the `Entity + Action + Layer` naming convention.
 - Avoid generic `Service`, `Manager`, and `utils.py` abstractions.
 - Add tests for handlers, aggregate invariants, and bug fixes.
@@ -262,6 +266,7 @@ uv run lint-imports
 uv run python manage.py check
 uv run python manage.py makemigrations --check --dry-run
 uv run pytest
+../scripts/ci/backend/mutation-test.sh
 ```
 
 Report checks that could not be run or did not pass.

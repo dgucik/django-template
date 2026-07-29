@@ -102,4 +102,22 @@ uv run lint-imports
 uv run python manage.py check
 uv run python manage.py makemigrations --check --dry-run
 uv run pytest
+../scripts/ci/backend/mutation-test.sh
 ```
+
+`mutmut` runs mutation testing against function and method bodies in
+`backend/apps/`. Tests colocated with business modules under `apps/` are
+executed but are not mutated. Architecture tests remain in the separate Import
+Linter and pytest checks because they inspect uninstrumented source code. The
+mutation check passes when every generated mutant is killed; it also handles a
+new project that does not contain any production functions yet. Inspect
+surviving or otherwise non-killed mutants with:
+
+```bash
+uv run mutmut run
+uv run mutmut results
+uv run mutmut browse
+```
+
+Mutation testing requires a system with `fork` support. On Windows, run it
+inside WSL.

@@ -18,6 +18,7 @@ dev = [
     "djangorestframework-stubs>=3.16.0",
     "django-stubs[compatible-mypy]>=5.2.0",
     "import-linter>=2.6.0",
+    "mutmut>=3.5.0,<4.0.0",
     "mypy>=1.15.0,<2.0.0",
     "pre-commit>=4.2.0",
     "pytest>=9.0.0",
@@ -29,15 +30,22 @@ dev = [
 DJANGO_SETTINGS_MODULE = "config.settings"
 python_files = ["test_*.py"]
 addopts = '-m "not postgresql"'
+norecursedirs = ["mutants"]
 markers = [
     "postgresql: tests that verify PostgreSQL-specific database permissions",
     "sqlite: tests that verify SQLite-specific database permissions",
 ]
 
+[tool.mutmut]
+source_paths = ["apps/"]
+also_copy = ["config/", "core/", "manage.py"]
+do_not_mutate = ["apps/**/tests/*.py"]
+pytest_add_cli_args_test_selection = ["apps/"]
+
 [tool.ruff]
 target-version = "py313"
 line-length = 100
-extend-exclude = ["migrations"]
+extend-exclude = ["migrations", "mutants"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "DJ", "RUF", "D"]
@@ -59,7 +67,7 @@ line-ending = "auto"
 [tool.mypy]
 python_version = "3.13"
 files = ["."]
-exclude = ["(^|/)(migrations|\\.venv)/"]
+exclude = ["(^|/)(migrations|mutants|\\.venv)/"]
 plugins = ["mypy_django_plugin.main"]
 check_untyped_defs = true
 no_implicit_optional = true
