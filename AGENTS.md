@@ -225,11 +225,146 @@ Prefer one aggregate per module.
 - Use-case orchestration belongs in handlers.
 - Do not use Django signals for cross-module workflows.
 
+### Aggregate example
+
+`ProductModel` is the aggregate root. It is the only model allowed to create or
+modify `ProductYearModel` and `ProductSettingsModel`. The child entities are
+data containers: they declare fields and database constraints but have no
+domain methods.
+
+The root exposes mutation operations only. Reads and projections belong in
+selectors and query handlers. Command handlers load the root and invoke one of
+its mutation methods inside the transaction supplied by `CommandHandler`.
+
+The product module defines its custom exceptions in `apps/products/exceptions.py`.
+Every custom exception inherits from `ApplicationError`:
+
+```python
+from core.exceptions import ApplicationError
+
+
+class ProductNameEmptyError(ApplicationError):
+    """Raised when a product name is empty."""
+
+
+class ProductNotSavedError(ApplicationError):
+    """Raised when an operation requires a persisted product."""
+
+
+class ProductPriceInvalidError(ApplicationError):
+    """Raised when a product price is invalid."""
+
+
+class ProductYearAlreadyExistsError(ApplicationError):
+    """Raised when a product already contains the requested year."""
+
+
+class ProductYearInvalidError(ApplicationError):
+    """Raised when a product year is invalid."""
+```
+
+```python
+from decimal import Decimal
+
+from django.db import models
+
+from ..exceptions import (
+    ProductNameEmptyError,
+    ProductNotSavedError,
+    ProductPriceInvalidError,
+    ProductYearAlreadyExistsError,
+    ProductYearInvalidError,
+)
+
+
+class ProductModel(models.Model):
+    """Aggregate root that maintains the consistency of a product."""
+
+    name = models.CharField(max_length=200)
+
+    def update_name(self, *, name: str) -> None:
+        """Update the product name while preserving its invariant."""
+        normalized_name = name.strip()
+        if not normalized_name:
+            raise ProductNameEmptyError
+
+        self.name = normalized_name
+        self.save(update_fields=["name"])
+
+    def add_new_year(self, *, year: int, price: Decimal) -> "ProductYearModel":
+        """Create a unique year owned by this product."""
+        if self.pk is None:
+            raise ProductNotSavedError
+        if year <= 0:
+            raise ProductYearInvalidError
+        if price < 0:
+            raise ProductPriceInvalidError
+        if ProductYearModel.objects.filter(product=self, year=year).exists():
+            raise ProductYearAlreadyExistsError
+
+        return ProductYearModel.objects.create(
+            product=self,
+            year=year,
+            price=price,
+        )
+
+    def update_settings(self, *, sales_enabled: bool) -> None:
+        """Create or update settings owned by this product."""
+        if self.pk is None:
+            raise ProductNotSavedError
+
+        ProductSettingsModel.objects.update_or_create(
+            product=self,
+            defaults={"sales_enabled": sales_enabled},
+        )
+
+
+class ProductYearModel(models.Model):
+    """Year entity owned by a product aggregate."""
+
+    product = models.ForeignKey(
+        ProductModel,
+        on_delete=models.CASCADE,
+        related_name="years",
+    )
+    year = models.PositiveIntegerField()
+    price = models.DecimalField(max_digits=12, decimal_places=2)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "year"],
+                name="unique_product_year",
+            ),
+        ]
+
+
+class ProductSettingsModel(models.Model):
+    """Settings entity owned by a product aggregate."""
+
+    product = models.OneToOneField(
+        ProductModel,
+        on_delete=models.CASCADE,
+        related_name="settings",
+    )
+    sales_enabled = models.BooleanField(default=False)
+```
+
+Code outside the aggregate must never call `ProductYearModel.objects.create`,
+change a `ProductYearModel` directly, or create/update `ProductSettingsModel`.
+Add another mutation method to `ProductModel` instead. This keeps aggregate
+invariants in one place and prevents child entities from becoming independent
+domain objects.
+
 ## Other layers
 
 - Selectors are private, read-only Django ORM helpers without business rules.
 - Services and factories are private and must not become cross-module APIs.
 - `backend/core/` contains only shared, domain-independent technical code.
+- `core.exceptions.ApplicationError` is the base class for every custom
+  application exception. Module-specific exceptions live in the module's
+  `exceptions.py` and must inherit from `ApplicationError`. Built-in and
+  framework exceptions are not application-defined custom exceptions.
 
 ## Code quality
 
