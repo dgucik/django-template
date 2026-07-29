@@ -268,6 +268,8 @@ from decimal import Decimal
 
 from django.db import models
 
+from core.models import BaseModel
+
 from ..exceptions import (
     ProductNameEmptyError,
     ProductNotSavedError,
@@ -277,7 +279,7 @@ from ..exceptions import (
 )
 
 
-class ProductModel(models.Model):
+class ProductModel(BaseModel):
     """Aggregate root that maintains the consistency of a product."""
 
     name = models.CharField(max_length=200)
@@ -319,7 +321,7 @@ class ProductModel(models.Model):
         )
 
 
-class ProductYearModel(models.Model):
+class ProductYearModel(BaseModel):
     """Year entity owned by a product aggregate."""
 
     product = models.ForeignKey(
@@ -339,7 +341,7 @@ class ProductYearModel(models.Model):
         ]
 
 
-class ProductSettingsModel(models.Model):
+class ProductSettingsModel(BaseModel):
     """Settings entity owned by a product aggregate."""
 
     product = models.OneToOneField(
